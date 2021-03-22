@@ -1,4 +1,4 @@
-package goff
+package gopherav
 
 //#cgo pkg-config: libavutil
 //#include <libavutil/error.h>

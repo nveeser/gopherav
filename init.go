@@ -1,4 +1,4 @@
-package goff
+package gopherav
 
 //#cgo pkg-config: libavformat libavcodec libavutil libavdevice libavfilter libswresample libswscale
 //#include <libavformat/avformat.h>

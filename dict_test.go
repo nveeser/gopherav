@@ -1,6 +1,9 @@
-package goff
+package gopherav
 
-import "testing"
+import (
+	"sort"
+	"testing"
+)
 import "github.com/google/go-cmp/cmp"
 
 func TesDictionary(t *testing.T) {
@@ -54,9 +57,9 @@ func TesDictionary(t *testing.T) {
 
 func TestDictionaryError(t *testing.T) {
 	cases := []struct {
-		name    string
-		input   map[string]string
-		wantErr bool
+		name     string
+		input    map[string]string
+		wantErr  bool
 		wantKeys []string
 	}{
 		{
@@ -105,6 +108,7 @@ func TestDictionaryError(t *testing.T) {
 				if !ok {
 					t.Errorf("toUnavailableOptionsErr() got error type: %T wanted *UnavailableOptionsErr", err)
 				}
+				sort.Strings(gotErr.Keys)
 				if diff := cmp.Diff(tc.wantKeys, gotErr.Keys); diff != "" {
 					t.Errorf("got: %s want %s\ndiff %s", gotErr.Keys, tc.wantKeys, diff)
 				}

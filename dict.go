@@ -1,4 +1,4 @@
-package goff
+package gopherav
 
 //#cgo pkg-config: libavutil
 //#include <libavutil/avutil.h>
@@ -6,7 +6,6 @@ package goff
 //#include <stdlib.h>
 import "C"
 import (
-	"fmt"
 	"unsafe"
 )
 
@@ -17,7 +16,6 @@ type Dictionary struct {
 func NewDictionary(m map[string]string) (*Dictionary, error) {
 	d := &Dictionary{}
 	for k, v := range m {
-		fmt.Printf("Add Key: %s", k)
 		Ckey := C.CString(k)
 		defer C.free(unsafe.Pointer(Ckey))
 
@@ -28,7 +26,6 @@ func NewDictionary(m map[string]string) (*Dictionary, error) {
 			return nil, ErrorFromCode(errno)
 		}
 	}
-	fmt.Printf("Done Converting: %p\n", d.ptr)
 	return d, nil
 }
 
