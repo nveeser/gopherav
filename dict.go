@@ -33,11 +33,11 @@ func (d *Dictionary) Size() int {
 	return int(C.av_dict_count(d.ptr))
 }
 
-func (d *Dictionary) pointer() unsafe.Pointer {
-	return unsafe.Pointer(d.ptr)
+func (d *Dictionary) pointer() *C.struct_AVDictionary {
+	return (*C.struct_AVDictionary)(unsafe.Pointer(d.ptr))
 }
-func (d *Dictionary) pointerRef() unsafe.Pointer {
-	return unsafe.Pointer(&d.ptr)
+func (d *Dictionary) pointerRef() **C.struct_AVDictionary {
+	return (**C.struct_AVDictionary)(unsafe.Pointer(&d.ptr))
 }
 
 func (d *Dictionary) free() {

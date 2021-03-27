@@ -15,11 +15,12 @@ const (
 	AvErrorEAGAIN = -35
 )
 
+func fromCode(c C.int) error { return ErrorFromCode(int(c)) }
+
 func ErrorFromCode(code int) error {
 	if code >= 0 {
 		return nil
 	}
-
 	return errors.New(C.GoString(C.error2string(C.int(code))))
 }
 

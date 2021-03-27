@@ -14,6 +14,8 @@ func main() {
 		log.Printf("Error: Couldn't open file: %s", err)
 		os.Exit(1)
 	}
+	defer format.Close()
+
 	if err := format.InitStreamInfo(nil); err != nil {
 		log.Printf("Error: Couldn't find stream information: %s\n", err)
 		os.Exit(1)
@@ -21,10 +23,19 @@ func main() {
 
 	for _, stream := range format.Streams() {
 		log.Printf("MediaType: %s", stream.CodecParameters().MediaType())
-		log.Printf("\tFrameRate: %d", stream.AvgFrameRate())
-		if cd := gopherav.FindDecoderCodec(stream.Codec().GetCodecId()); cd != nil {
-			log.Printf("\tCodec Name: %s", cd.String())
-			log.Printf("\tCodec Name: %s", cd.LongName())
+		log.Printf("\tFrameRate: %s", stream.AvgFrameRate())
+		cd, err := gopherav.FindCodec(stream.CodecParameters().CodecId(), gopherav.Decoder)
+		if err != nil {
+			log.Printf("error: finding codec: %s", err)
+			continue
 		}
+		log.Printf("\tCodec Name: %s", cd.String())
+		log.Printf("\tCodec Name: %s", cd.LongName())
+		decoder, err := stream.OpenCodecContext(gopherav.Decoder, nil)
+		if err != nil {
+			log.Printf("error: opening codec context: %s", err)
+			continue
+		}
+		decoder.Close()
 	}
 }

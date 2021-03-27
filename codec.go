@@ -6,29 +6,46 @@ package gopherav
 //#include <libavcodec/avcodec.h>
 import "C"
 import (
+	"fmt"
+	"math/big"
 	"reflect"
 	"unsafe"
 )
 
 type Codec C.struct_AVCodec
 
-func FindDecoderCodec(id CodecId) *Codec {
-	return (*Codec)(C.avcodec_find_decoder((C.enum_AVCodecID)(id)))
+type CodecMode int
+
+const (
+	Encoder CodecMode = 0
+	Decoder CodecMode = 1
+)
+
+func FindCodec(id CodecId, m CodecMode) (*Codec, error) {
+	var codec *Codec
+	switch m {
+	case Encoder:
+		codec = (*Codec)(C.avcodec_find_encoder((C.enum_AVCodecID)(id)))
+	case Decoder:
+		codec = (*Codec)(C.avcodec_find_decoder((C.enum_AVCodecID)(id)))
+	}
+	if codec == nil {
+		return nil, fmt.Errorf("not codec for codec id: %d", id)
+	}
+	return codec, nil
 }
 
-func FindEncoderCodec(id CodecId) *Codec {
-	return (*Codec)(C.avcodec_find_decoder((C.enum_AVCodecID)(id)))
-}
+func (c *Codec) String() string { return C.GoString(c.name) }
 
-func (c *Codec) String() string {
-	return C.GoString(c.name)
-}
+func (c *Codec) LongName() string { return C.GoString(c.long_name) }
 
-func (c *Codec) LongName() string {
-	return C.GoString(c.long_name)
-}
+func (c *Codec) pointer() *C.struct_AVCodec { return (*C.struct_AVCodec)(unsafe.Pointer(c)) }
 
 type CodecParameters C.struct_AVCodecParameters
+
+func (cp *CodecParameters) pointer() *C.struct_AVCodecParameters {
+	return (*C.struct_AVCodecParameters)(unsafe.Pointer(cp))
+}
 
 func (cp *CodecParameters) CodecId() CodecId {
 	return *((*CodecId)(unsafe.Pointer(&cp.codec_id)))
@@ -62,11 +79,41 @@ func (c *CodecContext) Type() MediaType {
 	return MediaType(c.ptr.codec_type)
 }
 
-func OpenCodec(*Codec) *CodecContext {
-	return nil
+func NewCodecContext(params *CodecParameters, m CodecMode, options map[string]string) (*CodecContext, error) {
+	codec, err := FindCodec(params.CodecId(), m)
+	if err != nil {
+		return nil, err
+	}
+
+	ctxPtr := (*C.struct_AVCodecContext)(unsafe.Pointer(C.avcodec_alloc_context3(codec.pointer())))
+
+	err = fromCode(C.avcodec_parameters_to_context(ctxPtr, params.pointer()))
+	if err != nil {
+		return nil, fmt.Errorf("error opening input: %w", err)
+	}
+
+	dict, err := NewDictionary(options)
+	if err != nil {
+		return nil, err
+	}
+	defer dict.free()
+
+	err = fromCode(C.avcodec_open2(ctxPtr, codec.pointer(), dict.pointerRef()))
+	if err != nil {
+		return nil, fmt.Errorf("error opening input: %w", err)
+	}
+
+	return &CodecContext{
+		ptr: ctxPtr,
+	}, nil
+	// AVStream *avs = avfc->streams[i];
+	// AVCodec *avc = avcodec_find_decoder(avs->codecpar->codec_id);
+	// AVCodecContext *avcc = avcodec_alloc_context3(*avc);
+	// avcodec_parameters_to_context(*avcc, avs- > codecpar)
+	// avcodec_open2(*avcc, *avc, NULL)
 }
 
-func (c *CodecContext) Release() {
+func (c *CodecContext) Close() {
 	C.avcodec_close((*C.struct_AVCodecContext)(unsafe.Pointer(c.ptr)))
 	C.av_freep(unsafe.Pointer(c))
 }
@@ -91,13 +138,12 @@ func (c *CodecContext) SetCodecType(ctype MediaType) {
 	c.ptr.codec_type = C.enum_AVMediaType(ctype)
 }
 
-func (c *CodecContext) GetTimeBase() Rational {
-	return fromStructRational(c.ptr.time_base)
+func (c *CodecContext) GetTimeBase() *big.Rat {
+	return fromCRational(c.ptr.time_base)
 }
 
-func (c *CodecContext) SetTimeBase(timeBase Rational) {
-	c.ptr.time_base.num = C.int(timeBase.Num)
-	c.ptr.time_base.den = C.int(timeBase.Den)
+func (c *CodecContext) SetTimeBase(timeBase *big.Rat) {
+	c.ptr.time_base = toCRational(timeBase)
 }
 
 func (c *CodecContext) GetWidth() int {
