@@ -3,6 +3,7 @@ package gopherav
 //#cgo pkg-config: libavcodec
 //#include <libavcodec/avcodec.h>
 import "C"
+
 import (
 	"math/big"
 	"unsafe"
@@ -11,7 +12,7 @@ import (
 type Packet C.struct_AVPacket
 
 func (p *Packet) unref() {
-	C.av_package_unref(toCPacket(p))
+	C.av_packet_unref(toCPacket(p))
 }
 
 func toCPacket(pkt *Packet) *C.struct_AVPacket {
@@ -23,15 +24,15 @@ func fromCPacket(pkt *C.struct_AVPacket) *Packet {
 }
 
 func toCRational(r *big.Rat) C.struct_AVRational {
+	if r == nil {
+		return C.struct_AVRational{}
+	}
 	if !r.Num().IsInt64() || !r.Denom().IsInt64() {
 		panic("only int64 int supported")
 	}
 	n, d := r.Num().Int64(), r.Denom().Int64()
 	if n == 0 && d == 1 {
-		return C.struct_AVRational{
-			num: 0,
-			den: 0,
-		}
+		return C.struct_AVRational{}
 	}
 	return C.struct_AVRational{
 		num: C.int(n),

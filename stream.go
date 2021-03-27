@@ -9,28 +9,12 @@ import (
 )
 
 type AvStream struct {
-	context *AvFormat
-	ptr     *C.struct_AVStream
-}
-
-//Rational av_stream_get_r_frame_rate (const AvStream *s)
-func (s *AvStream) GetRFrameRate() *big.Rat {
-	return fromCRational(C.av_stream_get_r_frame_rate((*C.struct_AVStream)(s.ptr)))
-}
-
-//void av_stream_set_r_frame_rate (AvStream *s, Rational r)
-func (s *AvStream) SetRFrameRate(r *big.Rat) {
-	cPtr := (*C.struct_AVStream)(s.ptr)
-	rat := toCRational(r)
-	C.av_stream_set_r_frame_rate(cPtr, rat)
+	format *AvFormat
+	ptr    *C.struct_AVStream
 }
 
 func (s *AvStream) OpenCodecContext(m CodecMode, options map[string]string) (*CodecContext, error) {
 	return NewCodecContext(s.CodecParameters(), m, options)
-}
-
-func (s *AvStream) CodexParameters() *CodecParameters {
-	return (*CodecParameters)(s.ptr.codecpar)
 }
 
 //int64_t av_stream_get_end_pts (const AvStream *st)
@@ -40,12 +24,21 @@ func (s *AvStream) AvStreamGetEndPts() int64 {
 }
 
 func (s *AvStream) CodecParameters() *CodecParameters {
-	return (*CodecParameters)(unsafe.Pointer(s.ptr.codecpar))
+	return fromCCodecParameters(s.ptr.codecpar)
 }
 
 func (s *AvStream) Metadata() map[string]string {
 	d := &Dictionary{ptr: s.ptr.metadata}
 	return d.toMap()
+}
+
+func (s *AvStream) GuessFrameRate() *big.Rat {
+	ctxPtr := (*C.struct_AVFormatContext)(unsafe.Pointer(s.format.ptr))
+
+	streamPtr := (*C.struct_AVStream)(unsafe.Pointer(s.ptr))
+
+	rat := C.av_guess_frame_rate(ctxPtr, streamPtr, nil)
+	return fromCRational(rat)
 }
 
 //func (s *AvStream) IndexEntries() *AvIndexEntry {
@@ -118,6 +111,6 @@ func (s *AvStream) NbFrames() int64 {
 
 //Return the next frame of a stream.
 func (c *AvStream) ReadFrame(pkt *Packet) error {
-	fmtCtx := (*C.struct_AVFormatContext)(unsafe.Pointer(c.context.ptr))
+	fmtCtx := (*C.struct_AVFormatContext)(unsafe.Pointer(c.format.ptr))
 	return fromCode(C.av_read_frame(fmtCtx, toCPacket(pkt)))
 }

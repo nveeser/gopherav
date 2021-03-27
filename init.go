@@ -4,6 +4,6 @@ package gopherav
 //#include <libavformat/avformat.h>
 import "C"
 
-func init() {
-	C.av_register_all()
-}
+//func init() {
+//	C.av_register_all()
+//}

@@ -17,12 +17,18 @@ type AvFormat struct {
 	ptr *C.struct_AVFormatContext
 }
 
-func Open(filename string, o *OpenOptions) (*AvFormat, error) {
+func (f *AvFormat) pointer() *C.struct_AVFormatContext {
+	return (*C.struct_AVFormatContext)(unsafe.Pointer(f.ptr))
+}
+func (f *AvFormat) pointerRef() **C.struct_AVFormatContext {
+	return (**C.struct_AVFormatContext)(unsafe.Pointer(&f.ptr))
+}
+
+func OpenInput(filename string, o *OpenOptions) (*AvFormat, error) {
 	if o == nil {
 		o = &OpenOptions{}
 	}
-	var ctx *C.struct_AVFormatContext
-	ctxPtr := (**C.struct_AVFormatContext)(unsafe.Pointer(&ctx))
+	format := &AvFormat{}
 
 	fmtPtr := (*C.struct_AVInputFormat)(C.NULL)
 
@@ -35,13 +41,26 @@ func Open(filename string, o *OpenOptions) (*AvFormat, error) {
 	}
 	dictPtr := (**C.struct_AVDictionary)(unsafe.Pointer(&dict.ptr))
 
-	errval := int(C.avformat_open_input(ctxPtr, cFile, fmtPtr, dictPtr))
-	err = ErrorFromCode(errval)
+	err = fromCode(C.avformat_open_input(format.pointerRef(), cFile, fmtPtr, dictPtr))
 	if err != nil {
 		return nil, fmt.Errorf("error opening input: %w", err)
 	}
 
-	return &AvFormat{ptr: ctx}, nil
+	return format, nil
+}
+
+func OpenOutput(filename string) (*AvFormat, error) {
+	format := &AvFormat{}
+
+	cFile := C.CString(filename)
+	defer C.free(unsafe.Pointer(cFile))
+
+	err := fromCode(C.avformat_alloc_output_context2(format.pointerRef(), nil, nil, cFile))
+	if err != nil {
+		return nil, fmt.Errorf("error opening input: %w", err)
+	}
+
+	return format, nil
 }
 
 func (f *AvFormat) InitStreamInfo(options map[string]string) error {
@@ -51,13 +70,23 @@ func (f *AvFormat) InitStreamInfo(options map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("error parsing optional dictionary: %w", err)
 	}
-	dictPtr := (**C.struct_AVDictionary)(unsafe.Pointer(&dict.ptr))
-	errval := int(C.avformat_find_stream_info(ctxPtr, dictPtr))
-	err = ErrorFromCode(errval)
+
+	err = fromCode(C.avformat_find_stream_info(ctxPtr, dict.pointerRef()))
 	if err != nil {
 		return fmt.Errorf("error opening input: %w", err)
 	}
 	return nil
+}
+
+func (f *AvFormat) NewStream(c *Codec) *AvStream {
+	s := C.avformat_new_stream(f.pointer(), c.pointer())
+	if s == nil {
+		return nil
+	}
+	return &AvStream{
+		format: f,
+		ptr:    s,
+	}
 }
 
 func (f *AvFormat) Streams() []*AvStream {
@@ -70,8 +99,8 @@ func (f *AvFormat) Streams() []*AvStream {
 	streams := make([]*AvStream, len(cstream))
 	for i, cs := range cstream {
 		streams[i] = &AvStream{
-			context: f,
-			ptr:     cs,
+			format: f,
+			ptr:    cs,
 		}
 	}
 	return streams
